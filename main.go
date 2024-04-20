@@ -1,50 +1,36 @@
 package main
 
 import (
-	"encoding/json"
-	"os"
+	"github.com/kobie/simple-database/database_manager"
+	"fmt"
 )
 
-func check(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
-
-type Address struct {
-	Street string
-	ZipCode int
-	State string
-}
-
-type Users struct {
-	FirstName string
-	LastName string
-	Email string
-	Address *Address
-}
 
 func main() {
-	err := os.MkdirAll("datastore/users", 0755 )
-	check(err)
+	dbDriver := database_manager.Driver{}
 
-	data := &Users{
+	user := &database_manager.Users{
 		FirstName: "lamar",
 		LastName: "jackson",
 		Email: "lamar@gmail.com",
-		Address: &Address{
+		Address: &database_manager.Address{
 			Street: "123 road",
 			ZipCode: 1123,
 			State: "New Jersey",
 		},
 	}
 
-	marshalledData, err := json.Marshal(data)
-	check(err)
+	// _, err := dbDriver.Create(user)
+	// if err != nil {
+	// 	fmt.Printf("error creating user: %v\n", err)
+	// }
 
-	createEmptyFile := func(fileName string) {
-		check(os.WriteFile(fileName, marshalledData, 0644))
+	user.Email = "lt@gmail.com"
+	user.Address.State = "New York"
+	update, err := dbDriver.Update(user)
+	if err != nil {
+		fmt.Printf("error updating: %v\n", err)
+	} else {
+		fmt.Printf("update: %+v \n", update)
 	}
-
-	createEmptyFile("datastore/users/lamar")
 }
