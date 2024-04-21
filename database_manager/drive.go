@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -56,15 +57,12 @@ func (d *Driver) Create(user *Users) (*Users, error) {
 		check(err)
 	}
 
-	user.ID = uuid.New().String()
+	//Get first 8 digits of uuid
+	user.ID = strings.Split(uuid.New().String(), "-")[0]
 	dataBytes, err := json.Marshal(user)
 	check(err)
 
-	if len(user.FirstName) < 1 {
-		return nil, errors.New("user must have a first name")
-	}
-
-	fileName := fmt.Sprintf("%s/%s.json", FILEPATH, user.FirstName)
+	fileName := fmt.Sprintf("%s/%s.json", FILEPATH, user.ID)
 	if exists(fileName) {
 		return nil, errors.New("this user already exists")
 	}
@@ -74,33 +72,23 @@ func (d *Driver) Create(user *Users) (*Users, error) {
 	return user, nil
 }
 
-func (d *Driver) Update(user *Users) (*Users, error) {
+func (d *Driver) Update(updateUser *Users) (*Users, error) {
+	user, err := d.GetByID(updateUser.ID)
+	if err != nil {
+		return nil, err
+	}
+
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
-	filePath := fmt.Sprintf("%s/%s.json", FILEPATH, user.FirstName)
-	if !exists(filePath) {
-		return nil, errors.Wrapf(errors.New("does not exists"), "user %v", user.FirstName)
-	}
-
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, errors.Wrap(err, "error reading file")
-	}
-
-	var userObject *Users
-	err = json.Unmarshal(data, &userObject)
-	if err != nil {
-		return nil, errors.Wrap(err, "unserializing data error")
-	}
-
-	_, err = diff.Merge(userObject, user, &userObject)
+	_, err = diff.Merge(user, updateUser, &user)
 	if err != nil {
 		return nil, errors.Wrap(err, "error merging change difference")
 	}
 
-	
-	dataBytes, err := json.Marshal(userObject)
+	filePath := fmt.Sprintf("%s/%s.json", FILEPATH, user.ID)
+
+	dataBytes, err := json.Marshal(user)
 	if err != nil {
 		return nil, err
 	}
@@ -110,19 +98,40 @@ func (d *Driver) Update(user *Users) (*Users, error) {
 		return nil, err
 	}
 
-	// err = file.Truncate(0)
-	// if err != nil {
-	// 	return nil, errors.Wrap(err, "error while trying to empty file")
-	// }
+	return user, nil
+}
 
-	// _, err = file.Seek(0,0)
-	// if err != nil {
-	// 	return nil, errors.Wrap(err, "error while trying to seek")
-	// }
-	// _, err = fmt.Fprintf(file, "%v", dataBytes)
-	// if err != nil {
-	// 	return nil, errors.Wrap(err, "error writing to file")
-	// }
+func (d *Driver) GetByID(ID string) (*Users, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 
-	return userObject, nil
+	filePath := fmt.Sprintf("%s/%s.json", FILEPATH, ID)
+	if !exists(filePath) {
+		return nil, errors.Wrapf(errors.New("does not exists"), "user %s", ID)
+	}
+
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, errors.Wrap(err, "error reading file")
+	}
+
+	var user *Users
+	err = json.Unmarshal(data, &user)
+	if err != nil {
+		return nil, errors.Wrap(err, "unserializing data error")
+	}
+
+	return user, nil
+}
+
+func (d *Driver) Delete(ID string) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	filePath := fmt.Sprintf("%s/%s.json", FILEPATH, ID)
+	err := os.Remove(filePath)
+	if err != nil {
+		return errors.New("error remove row")
+	}
+	return nil
 }

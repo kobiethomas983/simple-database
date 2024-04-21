@@ -20,17 +20,29 @@ func main() {
 		},
 	}
 
-	// _, err := dbDriver.Create(user)
-	// if err != nil {
-	// 	fmt.Printf("error creating user: %v\n", err)
-	// }
+	user, err := dbDriver.Create(user)
+	if err != nil {
+		fmt.Printf("error creating user: %v\n", err)
+	}
 
 	user.Email = "lt@gmail.com"
 	user.Address.State = "New York"
-	update, err := dbDriver.Update(user)
+	_, err = dbDriver.Update(user)
+	if err != nil {
+		fmt.Printf("error updating: %v\n", err)
+	}
+
+	user, err = dbDriver.GetByID(user.ID)
 	if err != nil {
 		fmt.Printf("error updating: %v\n", err)
 	} else {
-		fmt.Printf("update: %+v \n", update)
+		fmt.Printf("user: %+v\n", user)
 	}
+
+	err = dbDriver.Delete(user.ID)
+	if err != nil {
+		fmt.Printf("error deleting: %v \n", err)
+	}
+	fmt.Println("successfully deleted")
+
 }
