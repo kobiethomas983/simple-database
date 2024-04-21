@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"reflect"
 	"strings"
 	"sync"
 
 	"github.com/pkg/errors"
-	"github.com/r3labs/diff/v3"
 
 	"github.com/google/uuid"
 )
@@ -72,33 +72,47 @@ func (d *Driver) Create(user *Users) (*Users, error) {
 	return user, nil
 }
 
-func (d *Driver) Update(updateUser *Users) (*Users, error) {
-	user, err := d.GetByID(updateUser.ID)
-	if err != nil {
-		return nil, err
+func (d *Driver) Update(fieldUpdates map[string]interface{}, primaryID, collection string) (*Users, error) {
+	switch collection {
+	case "users":
+		user, err := d.GetByID(primaryID)
+		if err != nil {
+			return nil, err
+		}
+
+		d.mu.Lock()
+		defer d.mu.Unlock()
+
+		sourceObject := reflect.ValueOf(&user).Elem()
+		if sourceObject.Kind() == reflect.Ptr {
+			sourceObject = sourceObject.Elem()
+		}
+		for field, value := range fieldUpdates {
+			objectField := sourceObject.FieldByName(field)
+			if !objectField.IsValid() {
+				return nil, errors.New("field doesn't exist")
+			}
+			if objectField.CanSet() {
+				fieldValue := reflect.ValueOf(value)
+				objectField.Set(fieldValue)
+			}
+		}
+
+		filePath := fmt.Sprintf("%s/%s.json", FILEPATH, user.ID)
+		databytes, err := json.Marshal(user)
+		if err != nil {
+			return nil, err
+		}
+
+		err = os.WriteFile(filePath, databytes, 0644)
+		if err != nil {
+			return nil, errors.Wrap(err, "error writing update")
+		}
+		return user, nil
+
+	default:
+		return nil, errors.New("unsupported collection")
 	}
-
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
-	_, err = diff.Merge(user, updateUser, &user)
-	if err != nil {
-		return nil, errors.Wrap(err, "error merging change difference")
-	}
-
-	filePath := fmt.Sprintf("%s/%s.json", FILEPATH, user.ID)
-
-	dataBytes, err := json.Marshal(user)
-	if err != nil {
-		return nil, err
-	}
-
-	err = os.WriteFile(filePath, dataBytes, 0644)
-	if err != nil {
-		return nil, err
-	}
-
-	return user, nil
 }
 
 func (d *Driver) GetByID(ID string) (*Users, error) {

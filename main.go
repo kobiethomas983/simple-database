@@ -25,11 +25,15 @@ func main() {
 		fmt.Printf("error creating user: %v\n", err)
 	}
 
-	user.Email = "lt@gmail.com"
-	user.Address.State = "New York"
-	_, err = dbDriver.Update(user)
+	updates := map[string]interface{}{
+		"FirstName": "Jamal",
+		"LastName": "Brown",
+		"Email": "lt@gmail.com",
+	}
+
+	_, err = dbDriver.Update(updates, user.ID, "users")
 	if err != nil {
-		fmt.Printf("error updating: %v\n", err)
+		fmt.Println("error happened", err)
 	}
 
 	user, err = dbDriver.GetByID(user.ID)
@@ -38,11 +42,4 @@ func main() {
 	} else {
 		fmt.Printf("user: %+v\n", user)
 	}
-
-	err = dbDriver.Delete(user.ID)
-	if err != nil {
-		fmt.Printf("error deleting: %v \n", err)
-	}
-	fmt.Println("successfully deleted")
-
 }
